@@ -8,17 +8,18 @@ import (
 	"path/filepath"
 
 	"github.com/mochivi/local-media-streaming-server/api"
+	"github.com/mochivi/local-media-streaming-server/core"
 )
 
 func main() {
 	// dependencies
 	ctx := context.Background()
-
 	cwd, _ := os.Getwd()
 	root := filepath.Join(cwd, "/data")
 	fs := os.DirFS(root)
 
-	libraryHandler := api.NewLibraryHandler(ctx, fs, root)
+	scanner := core.NewFileScanner(ctx, fs, root)
+	libraryHandler := api.NewLibraryHandler(ctx, scanner)
 
 	go func() {
 		libraryHandler.Start()
@@ -28,6 +29,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/api/library", libraryHandler)
 	mux.HandleFunc("/api/stream/{filename}", func(w http.ResponseWriter, r *http.Request) {
+		log.Print("streaming not implemented")
 	})
 	s := &http.Server{
 		Addr:    ":8080",
