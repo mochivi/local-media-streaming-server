@@ -106,7 +106,7 @@ func (s *ScannerFileStorage) scan() error {
 		})
 		return nil
 	}); err != nil {
-		slog.Error("Error walking dir", "error", err)
+		slog.Error("scanner_walk_error", "error", err)
 	}
 
 	s.mu.Lock()

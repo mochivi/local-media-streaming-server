@@ -18,8 +18,6 @@ func NewLibraryHandler(storage core.FileStorage) *LibraryHandler {
 }
 
 func (h *LibraryHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// auth --> middleware later on
-
 	files := h.storage.Files()
 	json.NewEncoder(w).Encode(map[string]any{
 		"count": len(files),

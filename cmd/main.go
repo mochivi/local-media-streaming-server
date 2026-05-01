@@ -33,16 +33,21 @@ func main() {
 	mux.HandleFunc("/api/stream/{filename}", func(w http.ResponseWriter, r *http.Request) {
 		log.Print("streaming not implemented")
 	})
+
+	handler := api.RecoveryMiddleware(
+		api.MetricsLoggingMiddleware(mux),
+	)
+
 	s := &http.Server{
 		Addr:    ":8080",
-		Handler: mux,
+		Handler: handler,
 	}
 
 	// serve
-	slog.Info("Starting server...")
+	slog.Info("server_starting")
 	if err := s.ListenAndServe(); err != nil {
-		slog.Error("Server shutdown with an error", "error", err)
+		slog.Error("server_shutdown_error", "error", err)
 		os.Exit(1)
 	}
-	slog.Info("Server shutdown normally")
+	slog.Info("server_shutdown")
 }
