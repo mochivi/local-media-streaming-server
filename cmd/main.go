@@ -15,15 +15,11 @@ func main() {
 	// dependencies
 	ctx := context.Background()
 	cwd, _ := os.Getwd()
-	root := filepath.Join(cwd, "/data")
+	root := filepath.Join(cwd, "data")
 	fs := os.DirFS(root)
 
-	scanner := core.NewFileScanner(ctx, fs, root)
-	libraryHandler := api.NewLibraryHandler(ctx, scanner)
-
-	go func() {
-		libraryHandler.Start()
-	}()
+	fileStorage := core.NewScannerFileStorage(ctx, fs)
+	libraryHandler := api.NewLibraryHandler(fileStorage)
 
 	// http server
 	mux := http.NewServeMux()
@@ -37,6 +33,7 @@ func main() {
 	}
 
 	// serve
+	log.Printf("Starting server...")
 	if err := s.ListenAndServe(); err != nil {
 		log.Fatalf("Server shutdown with an error: %v", err)
 
