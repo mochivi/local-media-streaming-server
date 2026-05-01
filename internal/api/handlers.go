@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/mochivi/local-media-streaming-server/core"
+	"github.com/mochivi/local-media-streaming-server/internal/core"
 )
 
 type LibraryHandler struct {

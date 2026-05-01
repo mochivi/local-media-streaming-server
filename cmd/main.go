@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 
-	"github.com/mochivi/local-media-streaming-server/api"
-	"github.com/mochivi/local-media-streaming-server/core"
+	mediastreaming "github.com/mochivi/local-media-streaming-server/internal"
+	"github.com/mochivi/local-media-streaming-server/internal/api"
+	"github.com/mochivi/local-media-streaming-server/internal/core"
 )
 
 func main() {
@@ -17,6 +19,10 @@ func main() {
 	cwd, _ := os.Getwd()
 	root := filepath.Join(cwd, "data")
 	fs := os.DirFS(root)
+
+	// Init logger, use default logging with slog.Info() for now
+	// no passing *slog.Logger around
+	mediastreaming.InitLogger("info")
 
 	fileStorage := core.NewScannerFileStorage(ctx, fs)
 	libraryHandler := api.NewLibraryHandler(fileStorage)
@@ -33,10 +39,10 @@ func main() {
 	}
 
 	// serve
-	log.Printf("Starting server...")
+	slog.Info("Starting server...")
 	if err := s.ListenAndServe(); err != nil {
-		log.Fatalf("Server shutdown with an error: %v", err)
-
+		slog.Error("Server shutdown with an error", "error", err)
+		os.Exit(1)
 	}
-	log.Printf("Server shutdown normally")
+	slog.Info("Server shutdown normally")
 }

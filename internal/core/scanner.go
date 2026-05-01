@@ -3,7 +3,7 @@ package core
 import (
 	"context"
 	"io/fs"
-	"log"
+	"log/slog"
 	"slices"
 	"sync"
 	"time"
@@ -106,7 +106,7 @@ func (s *ScannerFileStorage) scan() error {
 		})
 		return nil
 	}); err != nil {
-		log.Printf("Error walking dir: %v", err)
+		slog.Error("Error walking dir", "error", err)
 	}
 
 	s.mu.Lock()
