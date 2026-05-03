@@ -2,8 +2,11 @@ package core
 
 import (
 	"context"
+	"errors"
 	"io/fs"
 	"log/slog"
+	"mime"
+	"path/filepath"
 	"slices"
 	"sync"
 	"time"
@@ -17,6 +20,7 @@ type FileStorage interface {
 
 type ScannerConfig struct {
 	scanPeriodSeconds time.Duration
+	allowedExtensions []string
 }
 
 type ScannerFileStorage struct {
@@ -35,6 +39,7 @@ func NewScannerFileStorage(ctx context.Context, fs fs.FS) FileStorage {
 		ctx: ctx,
 		config: ScannerConfig{
 			scanPeriodSeconds: 10 * time.Second,
+			allowedExtensions: []string{".mp4", ".mp3"},
 		},
 		fs: fs,
 	}
@@ -100,10 +105,16 @@ func (s *ScannerFileStorage) scan() error {
 			return nil // resursive walk enabled
 		}
 		fileSet[d.Name()] = true
-		files = append(files, MediaFile{
-			Name:     d.Name(),
-			MimeType: "", // extract details from the file
-		})
+
+		fileInfo, err := d.Info()
+		if err != nil {
+			return nil
+		}
+		mediaFile, err := s.makeValidMediaFile(fileInfo)
+		if err != nil {
+			return nil // file not valid
+		}
+		files = append(files, mediaFile)
 		return nil
 	}); err != nil {
 		slog.Error("scanner_walk_error", "error", err)
@@ -115,4 +126,19 @@ func (s *ScannerFileStorage) scan() error {
 	s.fileSet = fileSet
 
 	return nil
+}
+
+func (s *ScannerFileStorage) makeValidMediaFile(info fs.FileInfo) (MediaFile, error) {
+	ext := filepath.Ext(info.Name())
+	if !slices.Contains(s.config.allowedExtensions, ext) {
+		return MediaFile{}, errors.New("invalid extension")
+	}
+
+	return MediaFile{
+		Name:     info.Name(),
+		Size:     info.Size(),
+		Type:     ext,
+		ModTime:  info.ModTime(),
+		MimeType: mime.TypeByExtension(ext),
+	}, nil
 }
