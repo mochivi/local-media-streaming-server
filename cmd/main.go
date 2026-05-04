@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -26,13 +25,12 @@ func main() {
 
 	fileStorage := core.NewScannerFileStorage(ctx, fs)
 	libraryHandler := api.NewLibraryHandler(fileStorage)
+	streamingHandler := api.NewStreamHandler(fileStorage)
 
 	// http server
 	mux := http.NewServeMux()
 	mux.Handle("/api/library", libraryHandler)
-	mux.HandleFunc("/api/stream/{filename}", func(w http.ResponseWriter, r *http.Request) {
-		log.Print("streaming not implemented")
-	})
+	mux.Handle("/api/stream/{filename}", streamingHandler)
 
 	handler := api.RecoveryMiddleware(
 		api.MetricsLoggingMiddleware(mux),

@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"mime"
@@ -71,7 +72,13 @@ func (s *ScannerFileStorage) FindByName(name string) (MediaFile, bool) {
 	return MediaFile{}, false
 }
 
-func (s *ScannerFileStorage) Open(name string) (fs.File, error) { return nil, nil }
+func (s *ScannerFileStorage) Open(name string) (fs.File, error) {
+	f, err := s.fs.Open(name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	return f, nil
+}
 
 func (s *ScannerFileStorage) start() error {
 	// Scan the first time at start up, then launch scanning loop
