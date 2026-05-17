@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/fs"
 	"log/slog"
 	"mime"
@@ -14,9 +13,9 @@ import (
 )
 
 type FileStorage interface {
+	FileSystem() fs.FS
 	Files() []MediaFile
 	FindByName(name string) (MediaFile, bool)
-	Open(name string) (fs.File, error)
 }
 
 type ScannerConfig struct {
@@ -40,15 +39,13 @@ func NewScannerFileStorage(ctx context.Context, fs fs.FS) FileStorage {
 		ctx: ctx,
 		config: ScannerConfig{
 			scanPeriodSeconds: 10 * time.Second,
-			allowedExtensions: []string{".mp4", ".mp3"},
+			allowedExtensions: append(VideoExt, SubtitleExt...),
 		},
 		fs: fs,
 	}
-
 	go func() {
 		scanner.start()
 	}()
-
 	return scanner
 }
 
@@ -72,12 +69,8 @@ func (s *ScannerFileStorage) FindByName(name string) (MediaFile, bool) {
 	return MediaFile{}, false
 }
 
-func (s *ScannerFileStorage) Open(name string) (fs.File, error) {
-	f, err := s.fs.Open(name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file: %w", err)
-	}
-	return f, nil
+func (s *ScannerFileStorage) FileSystem() fs.FS {
+	return s.fs
 }
 
 func (s *ScannerFileStorage) start() error {

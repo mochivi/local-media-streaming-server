@@ -12,12 +12,24 @@ import (
 	"github.com/mochivi/local-media-streaming-server/internal/core"
 )
 
+func fromArgs(args []string) string {
+	root := args[0]
+	return root
+}
+
 func main() {
+	var root string
+	if len(os.Args) > 1 {
+		root = fromArgs(os.Args[1:])
+	}
+	if root == "" {
+		cwd, _ := os.Getwd()
+		root = filepath.Join(cwd, "data")
+	}
+	fs := os.DirFS(root)
+
 	// dependencies
 	ctx := context.Background()
-	cwd, _ := os.Getwd()
-	root := filepath.Join(cwd, "data")
-	fs := os.DirFS(root)
 
 	// Init logger, use default logging with slog.Info() for now
 	// no passing *slog.Logger around

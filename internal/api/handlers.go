@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -23,11 +24,45 @@ func NewLibraryHandler(storage core.FileStorage) *LibraryHandler {
 	}
 }
 
+// Organize internal files by Type hierarchy: video files contain subtitle files
+type MediaFileResponse struct {
+	Name      string `json:"name"`
+	Type      string `json:"type"`
+	Subtitles bool   `json:"subtitles"`
+}
+
 func (h *LibraryHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	files := h.storage.Files()
+
+	// Just a quick way to package subtitles, files with the same basename
+	// avoids needing a database to tie files to subtitles
+	// limits to only one subtitle file per video
+	resp := make([]MediaFileResponse, 0, len(files))
+	for _, media := range files {
+		if slices.Contains(core.VideoExt, media.Type) {
+			resp = append(resp, MediaFileResponse{
+				Name:      media.BaseName(),
+				Type:      media.Type,
+				Subtitles: false,
+			})
+		}
+	}
+	for i := range resp {
+		for _, media := range files {
+			if media.Type != ".srt" {
+				continue
+			}
+			if media.BaseName() == resp[i].Name {
+				resp[i].Subtitles = true
+				break
+			}
+
+		}
+	}
+
 	json.NewEncoder(w).Encode(map[string]any{
-		"count": len(files),
-		"data":  files,
+		"count": len(resp),
+		"data":  resp,
 	})
 }
 
@@ -63,7 +98,12 @@ func (h *StreamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.serveContent(w, media, start, end); err != nil {
+	isRangeRequest := true
+	if start == 0 && end == (media.Size-1) {
+		isRangeRequest = false
+	}
+
+	if err := h.serveContent(w, media, start, end, isRangeRequest); err != nil {
 		slog.Error("failed_serve_content", "error", err)
 		writeJSONError(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -131,34 +171,23 @@ func (h *StreamHandler) parseRange(header string, filesize int64) (int64, int64,
 	return start, end, nil
 }
 
-func (h *StreamHandler) serveContent(w http.ResponseWriter, media core.MediaFile, start, end int64) error {
-	f, err := h.storage.Open(media.Name)
+func (h *StreamHandler) serveContent(w http.ResponseWriter, media core.MediaFile, start, end int64, isRangeRequest bool) error {
+	rs, err := core.OpenSeekMedia(h.storage.FileSystem(), media, start)
 	if err != nil {
-		return errors.New("failed to open file")
+		return err
 	}
-	defer f.Close()
-
-	rs, ok := f.(io.ReadSeeker)
-	if !ok {
-		return errors.New("file is not seekable")
-	}
-
-	_, err = rs.Seek(start, io.SeekStart)
-	if err != nil {
-		return errors.New("failed to seek file")
-	}
+	defer rs.Close()
 
 	contentLength := end - start + 1
-
 	w.Header().Set("Content-Type", media.MimeType)
 	w.Header().Set("Content-Length", strconv.FormatInt(contentLength, 10))
 	w.Header().Set("Accept-Ranges", "bytes")
-	w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, media.Size))
 
-	if start == 0 && end == (media.Size-1) {
-		w.WriteHeader(http.StatusOK)
-	} else {
+	if isRangeRequest {
+		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, media.Size))
 		w.WriteHeader(http.StatusPartialContent)
+	} else {
+		w.WriteHeader(http.StatusOK)
 	}
 
 	// stream file
