@@ -68,10 +68,11 @@ func (h *LibraryHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type StreamHandler struct {
 	storage core.FileStorage
+	cache   *core.LookAheadCache
 }
 
 func NewStreamHandler(storage core.FileStorage) *StreamHandler {
-	return &StreamHandler{storage: storage}
+	return &StreamHandler{storage: storage, cache: core.NewLookAheadCache()}
 }
 
 func (h *StreamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -172,6 +173,12 @@ func (h *StreamHandler) parseRange(header string, filesize int64) (int64, int64,
 }
 
 func (h *StreamHandler) serveContent(w http.ResponseWriter, media core.MediaFile, start, end int64, isRangeRequest bool) error {
+	// read whatever's in the cache
+	// cacheData, nCacheRead, cacheReadOk := h.cache.Read(media.Name, start, int(end-start+1))
+	// if cacheReadOk {
+	// 	start = start + int64(nCacheRead)
+	// }
+
 	rs, err := core.OpenSeekMedia(h.storage.FileSystem(), media, start)
 	if err != nil {
 		return err
@@ -190,12 +197,22 @@ func (h *StreamHandler) serveContent(w http.ResponseWriter, media core.MediaFile
 		w.WriteHeader(http.StatusOK)
 	}
 
+	// if cacheReadOk {
+	// 	w.Write(cacheData)
+	// }
+
 	// stream file
 	_, err = io.CopyN(w, rs, contentLength)
 	if err != nil {
 		// cannot return an error after WriteHeader
 		slog.Error("stream_interrupted", "file", media.Name, "error", err)
 	}
+
+	// if isRangeRequest {
+	// 	go func() {
+	// 		h.cache.NewSection()
+	// 	}()
+	// }
 
 	return nil
 }
